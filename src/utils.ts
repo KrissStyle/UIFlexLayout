@@ -1,15 +1,13 @@
-/*
- *
+/**
+ * Translates UDim2 to Vector2
  */
-export function calculateSize(size: UDim2, parent: GuiBase2d) {
-	return new Vector2(
-		size.X.Scale * parent.AbsoluteSize.X + size.X.Offset,
-		size.Y.Scale * parent.AbsoluteSize.Y + size.Y.Offset,
-	)
+export function calculateSize(udim2: UDim2, vec: Vector2) {
+	return new Vector2(udim2.X.Scale * vec.X + udim2.X.Offset, udim2.Y.Scale * vec.Y + udim2.Y.Offset)
 }
 
-/*
- *	Returns max available size object can grow respecting AutomaticSize, AutomaticCanvasSize, uiConstraints, etc
+/**
+ * Returns max available size object can grow
+ * respecting AutomaticSize, AutomaticCanvasSize, uiConstraints, etc
  */
 function getAvailableSize(parentObject: GuiObject): Vector2 {
 	return parentObject.AbsoluteSize

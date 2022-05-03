@@ -25,7 +25,8 @@
 		"baseUrl": ".",
 		"incremental": true,
 		"tsBuildInfoFile": "build/tsconfig.tsbuildinfo",
-		"declaration": true
+		"declaration": true,
+		"plugins": [{ "transform": "rbxts-transform-debug" }]
 	},
 	"include": ["**/*", "../src/**/*"]
 }

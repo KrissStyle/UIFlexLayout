@@ -6,76 +6,101 @@ import { Uv } from '../Uv'
 import { calculateSize } from '../utils'
 import { FlexAttributes, FlexItemAttributes } from '../constants'
 import { Janitor } from '@rbxts/janitor'
+import { $print } from 'rbxts-transform-debug'
 
-export type FlexProperties = Partial<{
+export interface FlexProperties {
 	[FlexAttributes.AlingContent]: AlignContent
 	[FlexAttributes.AlignItems]: Align
 	[FlexAttributes.Direction]: Direction
 	[FlexAttributes.JustifyContent]: JustifyContent
-	[FlexAttributes.SortOrder]: Enum.SortOrder
+	[FlexAttributes.SortOrder]: 'LayoutOrder' | 'Name'
 	[FlexAttributes.Spacing]: UDim2
 	[FlexAttributes.Wrap]: Wrap
-}>
+}
 
-export type FlexItemProperties = Partial<{
+export interface FlexItemProperties {
 	[FlexItemAttributes.AlignSelf]: Align
 	[FlexItemAttributes.Basis]: UDim2
 	[FlexItemAttributes.Grow]: number
 	[FlexItemAttributes.Shrink]: number
-}>
+}
 
 export class UIFlexboxLayout {
-	// private janitor = new Janitor()
+	private janitor: Janitor
 
-	// constructor(private parent: GuiBase2d) {
-	// 	const update = () => this.ApplyLayout()
+	constructor(private parent: GuiBase2d) {
+		const update = () => this.ApplyLayout()
+		const childAdded = (child: Instance) => {
+			if (child.IsA('GuiObject')) {
+				this.janitor.Add(
+					parent.GetAttributeChangedSignal(FlexItemAttributes.AlignSelf).Connect(update),
+					'Disconnect',
+				)
+			}
+		}
+		const childRemoved = (child: Instance) => {}
 
-	// 	const childAdded = (child: Instance) => {
-	// 		if (classIs(child, 'GuiObject')) {
-	// 			this.janitor.Add(
-	// 				parent.GetAttributeChangedSignal(FlexItemAttributes.AlignSelf).Connect(update),
-	// 				'Disconnect',
-	// 			)
-	// 		}
-	// 	}
+		const janitor = new Janitor()
+		janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.AlignItems).Connect(update), 'Disconnect')
+		janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.AlingContent).Connect(update), 'Disconnect')
+		janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.Direction).Connect(update), 'Disconnect')
+		janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.JustifyContent).Connect(update), 'Disconnect')
+		janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.SortOrder).Connect(update), 'Disconnect')
+		janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.Spacing).Connect(update), 'Disconnect')
+		janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.Wrap).Connect(update), 'Disconnect')
+		janitor.Add(parent.GetPropertyChangedSignal('AbsoluteSize').Connect(update), 'Disconnect')
+		janitor.Add(parent.ChildAdded.Connect(childAdded), 'Disconnect')
+		janitor.Add(parent.ChildRemoved.Connect(childRemoved), 'Disconnect')
+		this.janitor = janitor
 
-	// 	this.janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.AlignItems).Connect(update), 'Disconnect')
-	// 	this.janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.AlingContent).Connect(update), 'Disconnect')
-	// 	this.janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.Direction).Connect(update), 'Disconnect')
-	// 	this.janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.JustifyContent).Connect(update), 'Disconnect')
-	// 	this.janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.SortOrder).Connect(update), 'Disconnect')
-	// 	this.janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.Spacing).Connect(update), 'Disconnect')
-	// 	this.janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.Wrap).Connect(update), 'Disconnect')
-
-	// 	this.janitor.Add(parent.GetPropertyChangedSignal('AbsoluteSize').Connect(update), 'Disconnect')
-	// 	this.janitor.Add(parent.ChildAdded.Connect(childAdded), 'Disconnect')
-	// 	this.janitor.Add(parent.ChildRemoved.Connect(childRemoved), 'Disconnect')
-	// }
+		this.ApplyLayout()
+	}
 
 	/**
 	 * ApplyLayout
 	 */
-	// public ApplyLayout(): void {}
-
-	public static Calculate(parent: GuiBase2d, items: GuiObject[]): Section[] {
+	public ApplyLayout(): void {
 		const {
 			FlexAlignContent = AlignContent.Stretch,
+			FlexAlignItems = Align.Stretch,
 			FlexDirection = Direction.Row,
-			FlexWrap = Wrap.NoWrap,
 			FlexJustifyContent = JustifyContent.FlexStart,
-			FlexAlignItems = Align.FlexStart,
-			SortOrder = Enum.SortOrder.LayoutOrder,
 			FlexSpacing = new UDim2(),
-		} = Attributes<FlexProperties>(parent)
+			FlexWrap = Wrap.NoWrap,
+			SortOrder = 'LayoutOrder',
+		} = Attributes<Partial<FlexProperties>>(this.parent)
+
+		const items = this.parent
+			.GetChildren()
+			.filter((x): x is GuiObject => x.IsA('GuiObject') && x.Visible)
+			.sort((a, b) => (SortOrder === 'Name' ? a.Name < b.Name : a.LayoutOrder < b.LayoutOrder))
+
+		const sections = this.Calculate(items)
+
+		this.Arrange(items, sections)
+	}
+
+	public Calculate(items: GuiObject[]): Section[] {
+		const {
+			FlexAlignContent = AlignContent.Stretch,
+			FlexAlignItems = Align.Stretch,
+			FlexDirection = Direction.Row,
+			FlexJustifyContent = JustifyContent.FlexStart,
+			FlexSpacing = new UDim2(),
+			FlexWrap = Wrap.NoWrap,
+			SortOrder = 'LayoutOrder',
+		} = Attributes<FlexProperties>(this.parent)
 
 		const isColumn = FlexDirection === Direction.Column || FlexDirection === Direction.ColumnReverse
 		const even = FlexJustifyContent === JustifyContent.SpaceEvenly ? 2 : 0
 
-		const max = Uv.fromVector2(parent.AbsoluteSize, isColumn)
-		const spacing = Uv.fromVector2(calculateSize(FlexSpacing, parent), isColumn)
+		const max = Uv.fromVector2(this.parent.AbsoluteSize, isColumn)
+		const spacing = Uv.fromVector2(calculateSize(FlexSpacing, this.parent.AbsoluteSize), isColumn)
 
 		let u = 0
 		let m = 0
+		let grow = 0
+		let shrink = 0
 
 		let maxV = 0
 		let first = 0
@@ -90,47 +115,52 @@ export class UIFlexboxLayout {
 				FlexShrink = 0,
 			} = Attributes<FlexItemProperties>(item)
 
-			const size = Uv.fromVector2(calculateSize(FlexBasis, parent), isColumn)
+			const basis = Uv.fromVector2(calculateSize(FlexBasis, this.parent.AbsoluteSize), isColumn)
 
-			if (FlexWrap !== Wrap.NoWrap && u + size.u + (m + even) * spacing.u > max.u) {
-				sections.push(new Section(first, i - 1, u, maxV))
+			if (FlexWrap !== Wrap.NoWrap && u + basis.u + (m + even) * spacing.u > max.u) {
+				sections.push(new Section(first, i - 1, u, maxV, grow, shrink))
 
 				u = 0
 				m = 0
 				maxV = 0
+				grow = 0
+				shrink = 0
 
 				first = i
 			}
 
-			if (size.v > maxV) maxV = size.v
+			if (basis.v > maxV) maxV = basis.v
 
-			u += size.u
+			grow += FlexGrow
+			shrink += FlexShrink
+
+			u += basis.u
 			m++
 		})
 
-		if (m !== 0) sections.push(new Section(first, first + m - 1, u, maxV))
+		if (m !== 0) sections.push(new Section(first, first + m - 1, u, maxV, grow, shrink))
 
 		if (FlexWrap === Wrap.WrapReverse) sections = reverseArray(sections)
 
 		return sections
 	}
 
-	public static Arrange(parent: GuiBase2d, items: GuiObject[], sections: Section[]) {
+	public Arrange(items: GuiObject[], sections: Section[]) {
 		const {
 			FlexAlignContent = AlignContent.Stretch,
+			FlexAlignItems = Align.Stretch,
 			FlexDirection = Direction.Row,
-			FlexWrap = Wrap.NoWrap,
 			FlexJustifyContent = JustifyContent.FlexStart,
-			FlexAlignItems = Align.FlexStart,
-			SortOrder = Enum.SortOrder.LayoutOrder,
 			FlexSpacing = new UDim2(),
-		} = Attributes<FlexProperties>(parent)
+			FlexWrap = Wrap.NoWrap,
+			SortOrder = 'LayoutOrder',
+		} = Attributes<FlexProperties>(this.parent)
 
 		const isColumn = FlexDirection === Direction.Column || FlexDirection === Direction.ColumnReverse
 		const isReverse = FlexDirection === Direction.ColumnReverse || FlexDirection === Direction.RowReverse
 
-		const max = Uv.fromVector2(parent.AbsoluteSize, isColumn)
-		const spacing = Uv.fromVector2(calculateSize(FlexSpacing, parent), isColumn)
+		const max = Uv.fromVector2(this.parent.AbsoluteSize, isColumn)
+		const spacing = Uv.fromVector2(calculateSize(FlexSpacing, this.parent.AbsoluteSize), isColumn)
 
 		const n = sections.size()
 
@@ -165,6 +195,8 @@ export class UIFlexboxLayout {
 		for (const section of sections) {
 			const sectionV = scaleV * section.v
 
+			const freeSpace = max.u - section.u
+
 			let spacingU = spacing.u
 			let u = 0
 			switch (FlexJustifyContent) {
@@ -198,8 +230,8 @@ export class UIFlexboxLayout {
 					FlexShrink = 0,
 				} = Attributes<FlexItemProperties>(item)
 
-				const basis = Uv.fromVector2(calculateSize(FlexBasis, parent), isColumn)
-				let offset = new Uv(0, 0)
+				const basis = Uv.fromVector2(calculateSize(FlexBasis, this.parent.AbsoluteSize), isColumn)
+				let offset = new Uv(math.floor((FlexGrow / section.grow) * freeSpace), 0)
 
 				const finalV =
 					FlexAlignSelf === Align.FlexEnd
@@ -208,7 +240,7 @@ export class UIFlexboxLayout {
 						? v + (sectionV - basis.v) / 2
 						: v
 
-				if (FlexAlignSelf === Align.Stretch) offset = new Uv(0, sectionV - basis.v)
+				if (FlexAlignSelf === Align.Stretch) offset = new Uv(offset.u, sectionV - basis.v)
 
 				const position = new Uv(isReverse ? max.u - basis.u - u : u, finalV)
 
@@ -217,23 +249,14 @@ export class UIFlexboxLayout {
 					UDim2.fromOffset(isColumn ? offset.v : offset.u, isColumn ? offset.u : offset.v),
 				)
 
-				u += basis.u + spacingU
+				u += basis.u + offset.u + spacingU
 			}
 
 			v += sectionV + spacingV
 		}
 	}
 
-	public static ApplyLayout(parent: GuiBase2d) {
-		const { SortOrder = Enum.SortOrder.LayoutOrder } = Attributes<FlexProperties>(parent)
-
-		const items = parent
-			.GetChildren()
-			.filter((x): x is GuiObject => x.IsA('GuiObject') && x.Visible)
-			.sort((a, b) => (SortOrder === Enum.SortOrder.Name ? a.Name < b.Name : a.LayoutOrder < b.LayoutOrder))
-
-		const sections = this.Calculate(parent, items)
-
-		this.Arrange(parent, items, sections)
+	public Destroy() {
+		this.janitor.Cleanup()
 	}
 }

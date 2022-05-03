@@ -18,11 +18,7 @@ function createRandomFrame() {
 	frame.BorderSizePixel = 0
 
 	const attr = Attributes<FlexItemProperties>(frame)
-	attr.FlexBasis = new UDim2(0.25, 0, 0, 50 /* math.random() * 100 + 50, math.random() * 100 + 50 */)
-	// const rng = math.random()
-	// if (rng > 0.75) frame.SetAttribute('AlignSelf', Align.Center)
-	// else if (rng > 0.5) frame.SetAttribute('AlignSelf', Align.FlexEnd)
-	// else if (rng > 0.25) frame.SetAttribute('AlignSelf', Align.Stretch)
+	attr.FlexBasis = UDim2.fromOffset(100, 50)
 	return frame
 }
 
@@ -33,15 +29,6 @@ for (let i = 0; i <= 20; i++) {
 }
 
 const attr = Attributes<FlexProperties>(gui)
-// attr.FlexAlignContent = AlignContent.FlexEnd
-// attr.FlexAlignItems = Align.FlexEnd
-// attr.FlexJustifyContent = JustifyContent.SpaceEvenly
-// attr.FlexAlignContent = AlignContent.FlexStart
-// attr.FlexSpacing = new UDim2(0, 10, 0, 0)
 attr.FlexWrap = Wrap.Wrap
 
-// const layout = new UIFlexboxLayout(gui)
-UIFlexboxLayout.ApplyLayout(gui)
-gui.GetPropertyChangedSignal('AbsoluteSize').Connect(() => UIFlexboxLayout.ApplyLayout(gui))
-// wait(30)
-// layout.ApplyLayout()
+const layout = new UIFlexboxLayout(gui)
