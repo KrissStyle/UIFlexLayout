@@ -1,0 +1,6 @@
+/node_modules
+/out
+/test/build
+/include
+*.tsbuildinfo
+/.yarn
