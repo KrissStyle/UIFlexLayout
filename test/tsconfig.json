@@ -20,7 +20,7 @@
 			"@rbxts/layouts": ["../src"],
 			"@rbxts/layouts/*": ["../src/*"]
 		},
-		"rootDirs": ["client", "../src"],
+		"rootDirs": ["server", "../src"],
 		"outDir": "build",
 		"baseUrl": ".",
 		"incremental": true,

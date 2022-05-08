@@ -18,13 +18,10 @@
 				}
 			}
 		},
-		"StarterPlayer": {
-			"$className": "StarterPlayer",
-			"StarterPlayerScripts": {
-				"$className": "StarterPlayerScripts",
-				"TS": {
-					"$path": "build/test/client"
-				}
+		"ServerScriptService": {
+			"$className": "ServerScriptService",
+			"TS": {
+				"$path": "build/test/server"
 			}
 		},
 		"Workspace": {

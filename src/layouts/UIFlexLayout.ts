@@ -1,12 +1,12 @@
 import Attributes from '@rbxts/attributes'
 import { reverseArray } from '@rbxts/reverse-array'
 import { AlignContent, Align, Direction, JustifyContent, Wrap } from '../enums'
-import { Section } from '../Section'
+import { ISection } from '../ISection'
 import { Uv } from '../Uv'
 import { calculateSize } from '../utils'
 import { FlexAttributes, FlexItemAttributes } from '../constants'
 import { Janitor } from '@rbxts/janitor'
-import { $print } from 'rbxts-transform-debug'
+import { $dbg, $print } from 'rbxts-transform-debug'
 
 export interface FlexProperties {
 	[FlexAttributes.AlingContent]: AlignContent
@@ -80,7 +80,7 @@ export class UIFlexboxLayout {
 		this.Arrange(items, sections)
 	}
 
-	public Calculate(items: GuiObject[]): Section[] {
+	public Calculate(items: GuiObject[]): ISection[] {
 		const {
 			FlexAlignContent = AlignContent.Stretch,
 			FlexAlignItems = Align.Stretch,
@@ -100,12 +100,12 @@ export class UIFlexboxLayout {
 		let u = 0
 		let m = 0
 		let grow = 0
-		let shrink = 0
+		let shrinkScaledSpace = 0
 
 		let maxV = 0
 		let first = 0
 
-		let sections: Section[] = []
+		let sections: ISection[] = []
 
 		items.forEach((item, i) => {
 			const {
@@ -117,14 +117,22 @@ export class UIFlexboxLayout {
 
 			const basis = Uv.fromVector2(calculateSize(FlexBasis, this.parent.AbsoluteSize), isColumn)
 
-			if (FlexWrap !== Wrap.NoWrap && u + basis.u + (m + even) * spacing.u > max.u) {
-				sections.push(new Section(first, i - 1, u, maxV, grow, shrink))
+			if (FlexWrap !== Wrap.NoWrap && u + basis.u + (m + even) * spacing.u >= max.u) {
+				sections.push({
+					first,
+					last: i - 1,
+					u,
+					v: maxV,
+					remainingSpace: max.u - u - (m + even - 1) * spacing.u,
+					totalGrow: grow,
+					scaledSpace: shrinkScaledSpace,
+				})
 
 				u = 0
 				m = 0
 				maxV = 0
 				grow = 0
-				shrink = 0
+				shrinkScaledSpace = 0
 
 				first = i
 			}
@@ -132,20 +140,29 @@ export class UIFlexboxLayout {
 			if (basis.v > maxV) maxV = basis.v
 
 			grow += FlexGrow
-			shrink += FlexShrink
+			shrinkScaledSpace += basis.u * FlexShrink
 
 			u += basis.u
 			m++
 		})
 
-		if (m !== 0) sections.push(new Section(first, first + m - 1, u, maxV, grow, shrink))
+		if (m !== 0)
+			sections.push({
+				first,
+				last: first + m - 1,
+				u,
+				v: maxV,
+				remainingSpace: max.u - u - (m + even - 1) * spacing.u,
+				totalGrow: grow,
+				scaledSpace: shrinkScaledSpace,
+			})
 
 		if (FlexWrap === Wrap.WrapReverse) sections = reverseArray(sections)
 
 		return sections
 	}
 
-	public Arrange(items: GuiObject[], sections: Section[]) {
+	public Arrange(items: GuiObject[], sections: ISection[]) {
 		const {
 			FlexAlignContent = AlignContent.Stretch,
 			FlexAlignItems = Align.Stretch,
@@ -195,8 +212,6 @@ export class UIFlexboxLayout {
 		for (const section of sections) {
 			const sectionV = scaleV * section.v
 
-			const freeSpace = max.u - section.u
-
 			let spacingU = spacing.u
 			let u = 0
 			switch (FlexJustifyContent) {
@@ -231,7 +246,12 @@ export class UIFlexboxLayout {
 				} = Attributes<FlexItemProperties>(item)
 
 				const basis = Uv.fromVector2(calculateSize(FlexBasis, this.parent.AbsoluteSize), isColumn)
-				let offset = new Uv(math.floor((FlexGrow / section.grow) * freeSpace), 0)
+				let offset = new Uv(
+					section.remainingSpace >= 0
+						? (FlexGrow / section.totalGrow) * section.remainingSpace
+						: (section.remainingSpace * (basis.u * FlexShrink)) / section.scaledSpace,
+					0,
+				)
 
 				const finalV =
 					FlexAlignSelf === Align.FlexEnd
@@ -242,7 +262,7 @@ export class UIFlexboxLayout {
 
 				if (FlexAlignSelf === Align.Stretch) offset = new Uv(offset.u, sectionV - basis.v)
 
-				const position = new Uv(isReverse ? max.u - basis.u - u : u, finalV)
+				const position = new Uv(isReverse ? max.u - basis.u - offset.u - u : u, finalV)
 
 				item.Position = UDim2.fromOffset(isColumn ? position.v : position.u, isColumn ? position.u : position.v)
 				item.Size = FlexBasis.add(
