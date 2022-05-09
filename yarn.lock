@@ -81,21 +81,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rbxts/janitor@npm:^1.14.1-ts.0":
-  version: 1.14.1-ts.0
-  resolution: "@rbxts/janitor@npm:1.14.1-ts.0"
-  checksum: 60787f963333d3b9b8a709e35b072e8b016829079bf593936a52c7adfdc2f745f0aced469fb5c9646887a0025bc3dd812963635aaadd4c77b5cb7550a21ca75d
-  languageName: node
-  linkType: hard
-
 "@rbxts/layouts@workspace:.":
   version: 0.0.0-use.local
   resolution: "@rbxts/layouts@workspace:."
   dependencies:
     "@rbxts/attributes": ^1.0.0
     "@rbxts/compiler-types": ^1.3.3-types.1
-    "@rbxts/janitor": ^1.14.1-ts.0
     "@rbxts/reverse-array": ^1.0.3
+    "@rbxts/trove": ^1.1.1
     "@rbxts/types": ^1.0.586
     "@typescript-eslint/eslint-plugin": ^5.21.0
     "@typescript-eslint/parser": ^5.21.0
@@ -122,6 +115,13 @@ __metadata:
   version: 0.3.1-ts.7
   resolution: "@rbxts/testez@npm:0.3.1-ts.7"
   checksum: 4a73fe8e3d45af811fe537137f0fc69b49ce04b56b5217a2cc89a22fa52234224df40ee19cfbfc86bd7d9b84bd9719ade51fd0a5943d79c90e94f69281654eb0
+  languageName: node
+  linkType: hard
+
+"@rbxts/trove@npm:^1.1.1":
+  version: 1.1.1
+  resolution: "@rbxts/trove@npm:1.1.1"
+  checksum: 787a34ebc0d47f4a55b92aa3b002cadddb6bf7ebce39114a6db1f0a39ebd870ebc1aa332c30ea32e87f69d8a8a904af53cef3f4ef2b127407db71bec56bcd923
   languageName: node
   linkType: hard
 

@@ -37,7 +37,7 @@
   },
   "dependencies": {
     "@rbxts/attributes": "^1.0.0",
-    "@rbxts/janitor": "^1.14.1-ts.0",
-    "@rbxts/reverse-array": "^1.0.3"
+    "@rbxts/reverse-array": "^1.0.3",
+    "@rbxts/trove": "^1.1.1"
   }
 }

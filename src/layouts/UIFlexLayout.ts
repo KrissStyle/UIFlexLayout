@@ -5,7 +5,7 @@ import { ISection } from '../ISection'
 import { Uv } from '../Uv'
 import { calculateSize } from '../utils'
 import { FlexAttributes, FlexItemAttributes } from '../constants'
-import { Janitor } from '@rbxts/janitor'
+import { Trove } from '@rbxts/trove'
 import { $dbg, $print } from 'rbxts-transform-debug'
 
 export interface FlexProperties {
@@ -25,33 +25,62 @@ export interface FlexItemProperties {
 	[FlexItemAttributes.Shrink]: number
 }
 
+const UDIM2_ZERO = new UDim2()
+
 export class UIFlexboxLayout {
-	private janitor: Janitor
+	private trove = new Trove()
 
 	constructor(private parent: GuiBase2d) {
 		const update = () => this.ApplyLayout()
 		const childAdded = (child: Instance) => {
 			if (child.IsA('GuiObject')) {
-				this.janitor.Add(
-					parent.GetAttributeChangedSignal(FlexItemAttributes.AlignSelf).Connect(update),
-					'Disconnect',
+				const childTrove = this.trove.extend()
+
+				childTrove.add(
+					(child as GuiObject & ChangedSignal).Changed.Connect((property) => {
+						if (property === 'Name' || property === 'LayoutOrder') {
+							update()
+						} else if (property === 'Parent') {
+							this.trove.remove(childTrove)
+							update()
+						}
+					}),
+				)
+				childTrove.add(
+					child.AttributeChanged.Connect((attribute) => {
+						if (
+							attribute === FlexItemAttributes.AlignSelf ||
+							attribute === FlexItemAttributes.Basis ||
+							attribute === FlexItemAttributes.Grow ||
+							attribute === FlexItemAttributes.Shrink
+						) {
+							update()
+						}
+					}),
 				)
 			}
 		}
-		const childRemoved = (child: Instance) => {}
 
-		const janitor = new Janitor()
-		janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.AlignItems).Connect(update), 'Disconnect')
-		janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.AlingContent).Connect(update), 'Disconnect')
-		janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.Direction).Connect(update), 'Disconnect')
-		janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.JustifyContent).Connect(update), 'Disconnect')
-		janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.SortOrder).Connect(update), 'Disconnect')
-		janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.Spacing).Connect(update), 'Disconnect')
-		janitor.Add(parent.GetAttributeChangedSignal(FlexAttributes.Wrap).Connect(update), 'Disconnect')
-		janitor.Add(parent.GetPropertyChangedSignal('AbsoluteSize').Connect(update), 'Disconnect')
-		janitor.Add(parent.ChildAdded.Connect(childAdded), 'Disconnect')
-		janitor.Add(parent.ChildRemoved.Connect(childRemoved), 'Disconnect')
-		this.janitor = janitor
+		this.trove.attachToInstance(parent)
+		this.trove.add(
+			parent.AttributeChanged.Connect((attribute) => {
+				if (
+					attribute === FlexAttributes.AlignItems ||
+					attribute === FlexAttributes.AlingContent ||
+					attribute === FlexAttributes.Direction ||
+					attribute === FlexAttributes.JustifyContent ||
+					attribute === FlexAttributes.SortOrder ||
+					attribute === FlexAttributes.Spacing ||
+					attribute === FlexAttributes.Wrap
+				) {
+					update()
+				}
+			}),
+		)
+		this.trove.add(parent.GetPropertyChangedSignal('AbsoluteSize').Connect(update))
+		this.trove.add(parent.ChildAdded.Connect(childAdded))
+
+		parent.GetChildren().forEach(childAdded)
 
 		this.ApplyLayout()
 	}
@@ -65,7 +94,7 @@ export class UIFlexboxLayout {
 			FlexAlignItems = Align.Stretch,
 			FlexDirection = Direction.Row,
 			FlexJustifyContent = JustifyContent.FlexStart,
-			FlexSpacing = new UDim2(),
+			FlexSpacing = UDIM2_ZERO,
 			FlexWrap = Wrap.NoWrap,
 			SortOrder = 'LayoutOrder',
 		} = Attributes<Partial<FlexProperties>>(this.parent)
@@ -86,7 +115,7 @@ export class UIFlexboxLayout {
 			FlexAlignItems = Align.Stretch,
 			FlexDirection = Direction.Row,
 			FlexJustifyContent = JustifyContent.FlexStart,
-			FlexSpacing = new UDim2(),
+			FlexSpacing = UDIM2_ZERO,
 			FlexWrap = Wrap.NoWrap,
 			SortOrder = 'LayoutOrder',
 		} = Attributes<FlexProperties>(this.parent)
@@ -110,7 +139,7 @@ export class UIFlexboxLayout {
 		items.forEach((item, i) => {
 			const {
 				FlexAlignSelf = FlexAlignItems,
-				FlexBasis = item.Size,
+				FlexBasis = UDIM2_ZERO,
 				FlexGrow = 1,
 				FlexShrink = 0,
 			} = Attributes<FlexItemProperties>(item)
@@ -168,7 +197,7 @@ export class UIFlexboxLayout {
 			FlexAlignItems = Align.Stretch,
 			FlexDirection = Direction.Row,
 			FlexJustifyContent = JustifyContent.FlexStart,
-			FlexSpacing = new UDim2(),
+			FlexSpacing = UDIM2_ZERO,
 			FlexWrap = Wrap.NoWrap,
 			SortOrder = 'LayoutOrder',
 		} = Attributes<FlexProperties>(this.parent)
@@ -240,7 +269,7 @@ export class UIFlexboxLayout {
 				const item = items[i]
 				const {
 					FlexAlignSelf = FlexAlignItems,
-					FlexBasis = item.Size,
+					FlexBasis = UDIM2_ZERO,
 					FlexGrow = 1,
 					FlexShrink = 0,
 				} = Attributes<FlexItemProperties>(item)
@@ -277,6 +306,6 @@ export class UIFlexboxLayout {
 	}
 
 	public Destroy() {
-		this.janitor.Cleanup()
+		this.trove.clean()
 	}
 }
