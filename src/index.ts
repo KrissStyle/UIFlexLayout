@@ -1,4 +1,4 @@
-export * from './layouts/UIFlexLayout'
+export * from './UIFlexLayout'
 export * from './constants'
 export * from './enums'
 export * from './utils'

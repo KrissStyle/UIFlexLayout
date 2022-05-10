@@ -1,10 +1,10 @@
 import Attributes from '@rbxts/attributes'
 import { reverseArray } from '@rbxts/reverse-array'
-import { AlignContent, Align, Direction, JustifyContent, Wrap } from '../enums'
-import { ISection } from '../ISection'
-import { Uv } from '../Uv'
-import { calculateSize } from '../utils'
-import { FlexAttributes, FlexItemAttributes } from '../constants'
+import { AlignContent, Align, Direction, JustifyContent, Wrap } from './enums'
+import { ISection } from './ISection'
+import { Uv } from './Uv'
+import { calculateSize } from './utils'
+import { FlexAttributes, FlexItemAttributes } from './constants'
 import { Trove } from '@rbxts/trove'
 import { $dbg, $print } from 'rbxts-transform-debug'
 
@@ -28,9 +28,12 @@ export interface FlexItemProperties {
 const UDIM2_ZERO = new UDim2()
 
 export class UIFlexboxLayout {
+	private container: GuiBase2d
 	private trove = new Trove()
 
-	constructor(private parent: GuiBase2d) {
+	constructor(container: GuiBase2d) {
+		this.container = container
+
 		const update = () => this.ApplyLayout()
 		const childAdded = (child: Instance) => {
 			if (child.IsA('GuiObject')) {
@@ -61,9 +64,9 @@ export class UIFlexboxLayout {
 			}
 		}
 
-		this.trove.attachToInstance(parent)
+		this.trove.attachToInstance(container)
 		this.trove.add(
-			parent.AttributeChanged.Connect((attribute) => {
+			container.AttributeChanged.Connect((attribute) => {
 				if (
 					attribute === FlexAttributes.AlignItems ||
 					attribute === FlexAttributes.AlingContent ||
@@ -77,10 +80,10 @@ export class UIFlexboxLayout {
 				}
 			}),
 		)
-		this.trove.add(parent.GetPropertyChangedSignal('AbsoluteSize').Connect(update))
-		this.trove.add(parent.ChildAdded.Connect(childAdded))
+		this.trove.add(container.GetPropertyChangedSignal('AbsoluteSize').Connect(update))
+		this.trove.add(container.ChildAdded.Connect(childAdded))
 
-		parent.GetChildren().forEach(childAdded)
+		container.GetChildren().forEach(childAdded)
 
 		this.ApplyLayout()
 	}
@@ -89,42 +92,27 @@ export class UIFlexboxLayout {
 	 * ApplyLayout
 	 */
 	public ApplyLayout(): void {
-		const {
-			FlexAlignContent = AlignContent.Stretch,
-			FlexAlignItems = Align.Stretch,
-			FlexDirection = Direction.Row,
-			FlexJustifyContent = JustifyContent.FlexStart,
-			FlexSpacing = UDIM2_ZERO,
-			FlexWrap = Wrap.NoWrap,
-			SortOrder = 'LayoutOrder',
-		} = Attributes<Partial<FlexProperties>>(this.parent)
+		const { SortOrder } = this.getContainerAttributes()
 
-		const items = this.parent
+		const items = this.container
 			.GetChildren()
 			.filter((x): x is GuiObject => x.IsA('GuiObject') && x.Visible)
 			.sort((a, b) => (SortOrder === 'Name' ? a.Name < b.Name : a.LayoutOrder < b.LayoutOrder))
 
-		const sections = this.Calculate(items)
+		const sections = this.calculate(items)
 
-		this.Arrange(items, sections)
+		this.reflow(items, sections)
 	}
 
-	public Calculate(items: GuiObject[]): ISection[] {
-		const {
-			FlexAlignContent = AlignContent.Stretch,
-			FlexAlignItems = Align.Stretch,
-			FlexDirection = Direction.Row,
-			FlexJustifyContent = JustifyContent.FlexStart,
-			FlexSpacing = UDIM2_ZERO,
-			FlexWrap = Wrap.NoWrap,
-			SortOrder = 'LayoutOrder',
-		} = Attributes<FlexProperties>(this.parent)
+	private calculate(items: GuiObject[]): ISection[] {
+		const { FlexAlignItems, FlexDirection, FlexJustifyContent, FlexSpacing, FlexWrap } =
+			this.getContainerAttributes()
 
 		const isColumn = FlexDirection === Direction.Column || FlexDirection === Direction.ColumnReverse
 		const even = FlexJustifyContent === JustifyContent.SpaceEvenly ? 2 : 0
 
-		const max = Uv.fromVector2(this.parent.AbsoluteSize, isColumn)
-		const spacing = Uv.fromVector2(calculateSize(FlexSpacing, this.parent.AbsoluteSize), isColumn)
+		const max = Uv.fromVector2(this.container.AbsoluteSize, isColumn)
+		const spacing = Uv.fromVector2(calculateSize(FlexSpacing, this.container.AbsoluteSize), isColumn)
 
 		let u = 0
 		let m = 0
@@ -137,14 +125,9 @@ export class UIFlexboxLayout {
 		let sections: ISection[] = []
 
 		items.forEach((item, i) => {
-			const {
-				FlexAlignSelf = FlexAlignItems,
-				FlexBasis = UDIM2_ZERO,
-				FlexGrow = 1,
-				FlexShrink = 0,
-			} = Attributes<FlexItemProperties>(item)
+			const { FlexBasis, FlexGrow, FlexShrink } = this.getItemAttributes(item, FlexAlignItems)
 
-			const basis = Uv.fromVector2(calculateSize(FlexBasis, this.parent.AbsoluteSize), isColumn)
+			const basis = Uv.fromVector2(calculateSize(FlexBasis, this.container.AbsoluteSize), isColumn)
 
 			if (FlexWrap !== Wrap.NoWrap && u + basis.u + (m + even) * spacing.u >= max.u) {
 				sections.push({
@@ -191,22 +174,14 @@ export class UIFlexboxLayout {
 		return sections
 	}
 
-	public Arrange(items: GuiObject[], sections: ISection[]) {
-		const {
-			FlexAlignContent = AlignContent.Stretch,
-			FlexAlignItems = Align.Stretch,
-			FlexDirection = Direction.Row,
-			FlexJustifyContent = JustifyContent.FlexStart,
-			FlexSpacing = UDIM2_ZERO,
-			FlexWrap = Wrap.NoWrap,
-			SortOrder = 'LayoutOrder',
-		} = Attributes<FlexProperties>(this.parent)
-
+	private reflow(items: GuiObject[], sections: ISection[]) {
+		const { FlexAlignContent, FlexAlignItems, FlexDirection, FlexJustifyContent, FlexSpacing } =
+			this.getContainerAttributes()
 		const isColumn = FlexDirection === Direction.Column || FlexDirection === Direction.ColumnReverse
 		const isReverse = FlexDirection === Direction.ColumnReverse || FlexDirection === Direction.RowReverse
 
-		const max = Uv.fromVector2(this.parent.AbsoluteSize, isColumn)
-		const spacing = Uv.fromVector2(calculateSize(FlexSpacing, this.parent.AbsoluteSize), isColumn)
+		const max = Uv.fromVector2(this.container.AbsoluteSize, isColumn)
+		const spacing = Uv.fromVector2(calculateSize(FlexSpacing, this.container.AbsoluteSize), isColumn)
 
 		const n = sections.size()
 
@@ -237,7 +212,6 @@ export class UIFlexboxLayout {
 		}
 
 		const scaleV = FlexAlignContent === AlignContent.Stretch ? (max.v - totalSpacingV) / totalSectionV : 1
-
 		for (const section of sections) {
 			const sectionV = scaleV * section.v
 
@@ -267,19 +241,14 @@ export class UIFlexboxLayout {
 
 			for (let i = section.first; i <= section.last; i++) {
 				const item = items[i]
-				const {
-					FlexAlignSelf = FlexAlignItems,
-					FlexBasis = UDIM2_ZERO,
-					FlexGrow = 1,
-					FlexShrink = 0,
-				} = Attributes<FlexItemProperties>(item)
+				const { FlexAlignSelf, FlexBasis, FlexGrow, FlexShrink } = this.getItemAttributes(item, FlexAlignItems)
 
-				const basis = Uv.fromVector2(calculateSize(FlexBasis, this.parent.AbsoluteSize), isColumn)
-				let offset = new Uv(
+				const basis = Uv.fromVector2(calculateSize(FlexBasis, this.container.AbsoluteSize), isColumn)
+				const offset = new Uv(
 					section.remainingSpace >= 0
 						? (FlexGrow / section.totalGrow) * section.remainingSpace
 						: (section.remainingSpace * (basis.u * FlexShrink)) / section.scaledSpace,
-					0,
+					FlexAlignSelf === Align.Stretch ? sectionV - basis.v : 0,
 				)
 
 				const finalV =
@@ -288,8 +257,6 @@ export class UIFlexboxLayout {
 						: FlexAlignSelf === Align.Center
 						? v + (sectionV - basis.v) / 2
 						: v
-
-				if (FlexAlignSelf === Align.Stretch) offset = new Uv(offset.u, sectionV - basis.v)
 
 				const position = new Uv(isReverse ? max.u - basis.u - offset.u - u : u, finalV)
 
@@ -302,6 +269,31 @@ export class UIFlexboxLayout {
 			}
 
 			v += sectionV + spacingV
+		}
+	}
+
+	private getContainerAttributes(): FlexProperties {
+		const att = Attributes<FlexProperties>(this.container)
+
+		return {
+			FlexAlignContent: att.FlexAlignContent ?? AlignContent.Stretch,
+			FlexAlignItems: att.FlexAlignItems ?? Align.Stretch,
+			FlexDirection: att.FlexDirection ?? Direction.Row,
+			FlexJustifyContent: att.FlexJustifyContent ?? JustifyContent.FlexStart,
+			FlexSpacing: att.FlexSpacing ?? UDIM2_ZERO,
+			FlexWrap: att.FlexWrap ?? Wrap.NoWrap,
+			SortOrder: att.SortOrder ?? 'LayoutOrder',
+		}
+	}
+
+	private getItemAttributes(item: GuiObject, FlexAlignItems: Align): FlexItemProperties {
+		const att = Attributes<FlexItemProperties>(item)
+
+		return {
+			FlexAlignSelf: att.FlexAlignSelf ?? FlexAlignItems,
+			FlexBasis: att.FlexBasis ?? UDIM2_ZERO,
+			FlexGrow: att.FlexGrow ?? 1,
+			FlexShrink: att.FlexShrink ?? 0,
 		}
 	}
 

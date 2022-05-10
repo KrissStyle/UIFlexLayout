@@ -36,7 +36,7 @@ for (let i = 0; i <= 6; i++) {
 }
 
 const attr = Attributes<FlexProperties>(mainFrame)
-attr.FlexJustifyContent = JustifyContent.FlexStart
+attr.FlexJustifyContent = JustifyContent.Center
 attr.FlexWrap = Wrap.Wrap
 attr.FlexDirection = Direction.Row
 attr.FlexSpacing = new UDim2(0, 10, 0, 10)
